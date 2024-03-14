@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm
 
 RUN apt-get -y update && \
 	apt-get install -y \
@@ -24,6 +24,7 @@ RUN apt-get -y update && \
 		libtool \
 		automake \
 		build-essential \
+        meson \
 		wget \
 		git \
 		gtk-doc-tools && \
@@ -32,32 +33,30 @@ RUN apt-get -y update && \
 
 
 RUN cd /tmp && \
-	wget https://github.com/cisco/libsrtp/archive/v2.3.0.tar.gz && \
-	tar xfv v2.3.0.tar.gz && \
-	cd libsrtp-2.3.0 && \
+	wget https://github.com/cisco/libsrtp/archive/v2.6.0.tar.gz && \
+	tar xfv v2.6.0.tar.gz && \
+	cd libsrtp-2.6.0 && \
 	./configure --prefix=/usr --enable-openssl && \
 	make shared_library && \
 	make install
 
 RUN cd /tmp && \
-	git clone https://gitlab.freedesktop.org/libnice/libnice && \
+	git clone -b 0.1.18 --depth 1 https://gitlab.freedesktop.org/libnice/libnice && \
 	cd libnice && \
-	git checkout 0.1.17 && \
-	./autogen.sh && \
-	./configure --prefix=/usr && \
-	make && \
-	make install
+    meson --prefix=/usr build && \
+    ninja -C build && \
+    ninja -C build install
 
-COPY . /usr/local/src/janus-gateway
 
-RUN cd /usr/local/src/janus-gateway && \
+RUN git clone -b v1.2.1 https://github.com/meetecho/janus-gateway.git && \
+    cd janus-gateway && \
 	sh autogen.sh && \
 	./configure --enable-post-processing --prefix=/usr/local && \
 	make && \
 	make install && \
 	make configs
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 ARG BUILD_DATE="undefined"
 ARG GIT_BRANCH="undefined"
@@ -76,7 +75,7 @@ RUN apt-get -y update && \
 		libavformat-dev \
 		libavcodec-dev \
 		libjansson4 \
-		libssl1.1 \
+		libssl3 \
 		libsofia-sip-ua0 \
 		libglib2.0-0 \
 		libopus0 \
@@ -84,8 +83,8 @@ RUN apt-get -y update && \
 		libcurl4 \
 		liblua5.3-0 \
 		libconfig9 \
-		libusrsctp1 \
-		libwebsockets16 \
+		libusrsctp2 \
+		libwebsockets17 \
 		libnanomsg5 \
 		librabbitmq4 && \
 	apt-get clean && \
@@ -94,10 +93,9 @@ RUN apt-get -y update && \
 COPY --from=0 /usr/lib/libsrtp2.so.1 /usr/lib/libsrtp2.so.1
 RUN ln -s /usr/lib/libsrtp2.so.1 /usr/lib/libsrtp2.so
 
-COPY --from=0 /usr/lib/libnice.la /usr/lib/libnice.la
-COPY --from=0 /usr/lib/libnice.so.10.10.0 /usr/lib/libnice.so.10.10.0
-RUN ln -s /usr/lib/libnice.so.10.10.0 /usr/lib/libnice.so.10
-RUN ln -s /usr/lib/libnice.so.10.10.0 /usr/lib/libnice.so
+COPY --from=0 /usr/lib/x86_64-linux-gnu/libnice.so.10.11.0 /usr/lib/x86_64-linux-gnu/libnice.so.10.11.0
+RUN ln -s /usr/lib/libnice.so.10.11.0 /usr/lib/libnice.so.10
+RUN ln -s /usr/lib/libnice.so.10.11.0 /usr/lib/libnice.so
 
 COPY --from=0 /usr/local/bin/janus /usr/local/bin/janus
 COPY --from=0 /usr/local/bin/janus-pp-rec /usr/local/bin/janus-pp-rec
